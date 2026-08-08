@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Dev is included so PRs into it get build/test/format checks too.
+    # Deploy and migrate stay gated to `push` on `main` only (see the
+    # `migrate`/`deploy` job conditions below) — Dev never deploys.
+    branches: [main, Dev]
 
 permissions:
   contents: read
