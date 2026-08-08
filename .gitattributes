@@ -1,0 +1,15 @@
+# Normalise line endings. Without this, the Mac and the Windows machine
+# produce diffs where every line of every file appears changed.
+* text=auto eol=lf
+
+*.sln       text eol=crlf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.sh        text eol=lf
+
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.pdf       binary
+*.dll       binary
+tailwindcss binary

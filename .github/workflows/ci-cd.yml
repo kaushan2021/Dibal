@@ -1,0 +1,112 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from global.json — do not hardcode it here.
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props') }}
+
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test --no-build -c Release --verbosity normal
+
+      # Fails the build if anyone committed unformatted code.
+      - run: dotnet format --verify-no-changes --no-restore
+
+  # Migrations run BEFORE deploy. The old code must tolerate the new schema
+  # for the length of one deploy; that is true of any additive migration
+  # (new table, new nullable column, new index).
+  #
+  # A DESTRUCTIVE migration breaks that assumption in the other direction —
+  # the live code still reads the column you are dropping. Those must be
+  # split across two deploys: ship code that no longer uses the column, then
+  # drop it in the next PR. Do not reorder these jobs to work around it.
+  migrate:
+    name: Apply EF Core migrations
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - run: dotnet tool install --global dotnet-ef
+
+      - name: Update database
+        run: >
+          dotnet ef database update
+          --project src/Dibal.Infrastructure
+          --startup-project src/Dibal.Web
+        env:
+          ConnectionStrings__Default: ${{ secrets.NEON_PROD_CONNECTION }}
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: migrate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # The image is built here, not on your Mac. The Mac is ARM64 and
+      # Fly runs x86-64 — building locally produces an image that will not run.
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # Staging is the Render free tier (see docs/01-architecture.md). Cold starts
+  # are acceptable there. The job is a no-op until RENDER_DEPLOY_HOOK is set,
+  # so it does not fail the run before staging exists.
+  #
+  # The secret is checked in a step, not in `if:` at job level — the `secrets`
+  # context is not available to a job-level `if`.
+  deploy-staging:
+    name: Deploy to Render (staging)
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+    steps:
+      - name: Trigger Render deploy
+        if: env.RENDER_DEPLOY_HOOK != ''
+        run: curl -fsSL -X POST "$RENDER_DEPLOY_HOOK"
+
+      - name: Skip
+        if: env.RENDER_DEPLOY_HOOK == ''
+        run: echo "RENDER_DEPLOY_HOOK is not set — staging deploy skipped."
