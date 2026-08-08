@@ -1,0 +1,81 @@
+name: Nightly database backup
+
+# The database is on a free tier with a short restore window.
+# THIS is the real backup. Treat a failure here as a production incident.
+
+on:
+  schedule:
+    - cron: "15 2 * * *"   # 02:15 UTC daily
+  workflow_dispatch:        # manual trigger, also used for restore drills
+
+permissions:
+  contents: read
+
+# A manually-dispatched restore drill must not run on top of the nightly cron.
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt \
+            $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump, compress and encrypt
+        env:
+          PGCONN: ${{ secrets.NEON_PROD_CONNECTION }}
+          GPG_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+
+          pg_dump --format=custom --no-owner --no-privileges "$PGCONN" \
+            > "dibal-$STAMP.dump"
+
+          # Fail loudly on a suspiciously small dump rather than silently
+          # uploading an empty file every night for six months.
+          SIZE=$(stat -c%s "dibal-$STAMP.dump")
+          echo "Dump size: $SIZE bytes"
+          if [ "$SIZE" -lt 10240 ]; then
+            echo "::error::Dump is under 10KB — treating as failed."
+            exit 1
+          fi
+
+          gzip -9 "dibal-$STAMP.dump"
+          gpg --batch --yes --symmetric --cipher-algo AES256 \
+              --passphrase "$GPG_PASSPHRASE" \
+              "dibal-$STAMP.dump.gz"
+
+          sha256sum "dibal-$STAMP.dump.gz.gpg" \
+            > "dibal-$STAMP.dump.gz.gpg.sha256"
+
+      - name: Upload to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          for f in "dibal-$STAMP.dump.gz.gpg" "dibal-$STAMP.dump.gz.gpg.sha256"; do
+            aws s3 cp "$f" "s3://dibal-backups/daily/$f" \
+              --endpoint-url "$R2_ENDPOINT"
+          done
+
+      # Retention is handled by R2 lifecycle rules (30 daily, 12 monthly),
+      # not by this script. Lifecycle rules survive a broken workflow.
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Nightly backup FAILED. Investigate immediately."
+          # Wire this to email or a webhook once Phase 5 is done.

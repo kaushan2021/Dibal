@@ -1,0 +1,48 @@
+app = "dibal"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  ASPNETCORE_URLS = "http://+:8080"
+  ASPNETCORE_ENVIRONMENT = "Production"
+  DOTNET_gcServer = "0"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # Blazor InteractiveServer needs a live SignalR circuit.
+  # Do NOT enable auto-stop: a stopped machine kills every open circuit.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 40
+    hard_limit = 60
+
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "20s"
+  method = "GET"
+  path = "/health"
+
+# Data Protection keys must survive restarts or every user is logged out
+# on deploy and the encrypted SMTP password becomes unreadable.
+#
+# Consequence, not an accident: a volume pins this app to ONE machine in ONE
+# region. No horizontal scale-out, and no blue-green deploys — Fly must stop
+# the machine to reattach the volume, so every deploy has a short gap. Correct
+# at 3–5 users. If that ever stops being true, move the keys to a shared store
+# (R2 or the database) before adding a second machine.
+[mounts]
+  source = "dibal_keys"
+  destination = "/keys"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

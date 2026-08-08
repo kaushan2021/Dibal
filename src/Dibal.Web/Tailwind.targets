@@ -1,0 +1,90 @@
+<Project>
+
+  <!--
+    Tailwind via the standalone CLI. No Node in the build (docs/01-architecture.md).
+
+    The binary is DOWNLOADED PER PLATFORM at build time into a gitignored
+    tools/ directory, not committed. This repo builds on an ARM64 Mac, a
+    Windows desktop and a linux-x64 container — one committed binary cannot
+    serve all three, so vendoring it would break two of the three machines.
+
+    Import this from Dibal.Web.csproj:
+        <Import Project="Tailwind.targets" />
+  -->
+
+  <PropertyGroup>
+    <!-- Pinned deliberately. Bump it as a reviewed change, not incidentally. -->
+    <TailwindVersion Condition="'$(TailwindVersion)' == ''">4.1.11</TailwindVersion>
+
+    <TailwindInput Condition="'$(TailwindInput)' == ''">$(MSBuildThisFileDirectory)Styles/app.css</TailwindInput>
+    <TailwindOutput Condition="'$(TailwindOutput)' == ''">$(MSBuildThisFileDirectory)wwwroot/css/app.css</TailwindOutput>
+
+    <!-- Repo-root tools/, shared by every project and ignored by git. -->
+    <TailwindToolDir>$(MSBuildThisFileDirectory)../../tools/tailwind/$(TailwindVersion)/</TailwindToolDir>
+  </PropertyGroup>
+
+  <!-- Resolve the asset name for the machine doing the build. -->
+  <PropertyGroup>
+    <_TwOs Condition="$([MSBuild]::IsOSPlatform('Linux'))">linux</_TwOs>
+    <_TwOs Condition="$([MSBuild]::IsOSPlatform('OSX'))">macos</_TwOs>
+    <_TwOs Condition="$([MSBuild]::IsOSPlatform('Windows'))">windows</_TwOs>
+
+    <_TwArch>x64</_TwArch>
+    <_TwArch Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">arm64</_TwArch>
+
+    <_TwExt Condition="'$(_TwOs)' == 'windows'">.exe</_TwExt>
+
+    <_TwAsset>tailwindcss-$(_TwOs)-$(_TwArch)$(_TwExt)</_TwAsset>
+    <_TwUrl>https://github.com/tailwindlabs/tailwindcss/releases/download/v$(TailwindVersion)/$(_TwAsset)</_TwUrl>
+    <TailwindExe>$(TailwindToolDir)tailwindcss$(_TwExt)</TailwindExe>
+  </PropertyGroup>
+
+  <Target Name="EnsureTailwindCli" Condition="!Exists('$(TailwindExe)')">
+    <Error Condition="'$(_TwOs)' == ''"
+           Text="Tailwind: unsupported build OS. Expected Linux, macOS or Windows." />
+
+    <Message Importance="high" Text="Tailwind: downloading $(_TwAsset) v$(TailwindVersion)" />
+
+    <MakeDir Directories="$(TailwindToolDir)" />
+    <DownloadFile SourceUrl="$(_TwUrl)"
+                  DestinationFolder="$(TailwindToolDir)"
+                  DestinationFileName="tailwindcss$(_TwExt)"
+                  Retries="3" />
+
+    <Exec Condition="'$(_TwOs)' != 'windows'"
+          Command="chmod +x &quot;$(TailwindExe)&quot;" />
+  </Target>
+
+  <!--
+    Inputs/Outputs give incremental builds: an unchanged stylesheet does not
+    re-run the CLI. Tailwind v4 scans source files for class names, so the
+    Razor markup is an input too.
+  -->
+  <Target Name="BuildTailwindCss"
+          DependsOnTargets="EnsureTailwindCli"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(TailwindInput);@(Compile);@(Content)"
+          Outputs="$(TailwindOutput)">
+
+    <PropertyGroup>
+      <_TwMinify Condition="'$(Configuration)' == 'Release'">--minify</_TwMinify>
+    </PropertyGroup>
+
+    <Exec Command="&quot;$(TailwindExe)&quot; --input &quot;$(TailwindInput)&quot; --output &quot;$(TailwindOutput)&quot; $(_TwMinify)" />
+  </Target>
+
+  <!--
+    The generated file does not exist on a clean clone, so it is not picked up
+    by the default wwwroot glob during evaluation. Add it explicitly once the
+    target above has produced it, or publish ships a site with no stylesheet.
+  -->
+  <Target Name="IncludeTailwindOutput"
+          AfterTargets="BuildTailwindCss"
+          BeforeTargets="ResolveStaticWebAssetsInputs">
+    <ItemGroup>
+      <Content Include="$(TailwindOutput)"
+               Condition="Exists('$(TailwindOutput)') AND !@(Content->AnyHaveMetadataValue('FullPath', '$([System.IO.Path]::GetFullPath('$(TailwindOutput)'))'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>

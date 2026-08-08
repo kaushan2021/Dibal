@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------
+# .NET
+# ---------------------------------------------------------------
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*.dll
+*.exe
+*.pdb
+project.lock.json
+project.fragment.lock.json
+
+# Test and coverage output
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.trx
+
+# ---------------------------------------------------------------
+# JetBrains Rider
+# ---------------------------------------------------------------
+.idea/
+*.sln.iml
+_ReSharper*/
+*.[Rr]e[Ss]harper.user
+*.DotSettings.user
+
+# ---------------------------------------------------------------
+# Visual Studio / VS Code
+# ---------------------------------------------------------------
+.vs/
+.vscode/
+*.vsidx
+
+# ---------------------------------------------------------------
+# Tooling
+# ---------------------------------------------------------------
+# The Tailwind standalone CLI is downloaded per-RID at build time by
+# src/Dibal.Web/Tailwind.targets. It is never committed — the same repo
+# builds on an ARM Mac, a Windows desktop and a linux-x64 container.
+tools/
+
+# Tailwind output is generated from the source stylesheet.
+src/Dibal.Web/wwwroot/css/app.css
+
+# ---------------------------------------------------------------
+# Secrets and local state
+# ---------------------------------------------------------------
+# Secrets live in `dotnet user-secrets` (local) and Fly secrets (production).
+# Nothing below should ever exist in this repo — these are backstops.
+appsettings.*.local.json
+*.env
+.env
+.env.*
+*.pem
+*.pfx
+
+# Serilog rolling file output
+logs/
+
+# ---------------------------------------------------------------
+# OS noise
+# ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
