@@ -20,6 +20,23 @@ jobs:
   build:
     name: Build and test
     runs-on: ubuntu-latest
+    # Dibal.Tests runs real integration tests against Postgres — citext,
+    # native enums, and generated columns have no in-memory-provider
+    # equivalent, and those are exactly the parts of the schema worth testing.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: dibal_ci
+          POSTGRES_PASSWORD: dibal_ci
+          POSTGRES_DB: dibal_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +54,8 @@ jobs:
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
       - run: dotnet test --no-build -c Release --verbosity normal
+        env:
+          DIBAL_TEST_CONNECTION: Host=localhost;Port=5432;Username=dibal_ci;Password=dibal_ci;Database=dibal_test
 
       # Fails the build if anyone committed unformatted code.
       - run: dotnet format --verify-no-changes --no-restore
