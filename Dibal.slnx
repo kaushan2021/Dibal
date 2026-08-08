@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dibal.Domain/Dibal.Domain.csproj" />
+    <Project Path="src/Dibal.Infrastructure/Dibal.Infrastructure.csproj" />
+    <Project Path="src/Dibal.Web/Dibal.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dibal.Tests/Dibal.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,68 @@
+@page "/clients/{Id:guid}/edit"
+@using Dibal.Infrastructure.Identity
+@using Dibal.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize(Roles = Roles.ManagerAndAbove)]
+@inject DibalDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>Edit client</PageTitle>
+
+@if (_client is null)
+{
+    <p class="text-slate-500">Client not found.</p>
+}
+else
+{
+    <h1 class="text-xl font-semibold">Edit @_client.BusinessName</h1>
+
+    <EditForm Model="Model" FormName="client-edit" OnValidSubmit="SubmitAsync" method="post" class="mt-4 max-w-2xl">
+        <DataAnnotationsValidator />
+        <ClientFormFields Model="Model" />
+
+        <div class="mt-6 flex gap-2">
+            <button type="submit" class="rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
+                Save
+            </button>
+            <a href="/clients/@Id" class="rounded border px-4 py-2 hover:bg-slate-50">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = null!;
+
+    [SupplyParameterFromForm]
+    public ClientFormModel Model { get; set; } = new();
+
+    private Domain.Entities.Client? _client;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _client = await Db.Clients.FirstOrDefaultAsync(c => c.Id == Id);
+
+        // Only populate from the entity on the initial GET. On a POST,
+        // [SupplyParameterFromForm] has already bound Model from the
+        // submitted form — overwriting it here would discard the user's edits
+        // before SubmitAsync (which runs after OnInitializedAsync) gets them.
+        if (_client is not null && HttpMethods.IsGet(HttpContext.Request.Method))
+        {
+            Model = ClientFormModel.FromEntity(_client);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        Model.ApplyTo(_client);
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo($"/clients/{_client.Id}", forceLoad: true);
+    }
+}

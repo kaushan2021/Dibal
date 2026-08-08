@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+
+<div class="flex min-h-screen flex-col md:flex-row">
+    <NavMenu />
+
+    <main class="flex-1">
+        <article class="p-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" class="fixed inset-x-0 bottom-0 bg-red-600 p-3 text-center text-white" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="underline">Reload</a>
+    <span class="cursor-pointer" onclick="document.getElementById('blazor-error-ui').style.display='none'">🗙</span>
+</div>

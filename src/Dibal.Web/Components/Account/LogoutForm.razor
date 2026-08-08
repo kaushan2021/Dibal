@@ -1,0 +1,18 @@
+@using Dibal.Infrastructure.Identity
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<AppUser> SignInManager
+@inject NavigationManager Navigation
+
+<EditForm Model="_model" FormName="logout" OnValidSubmit="SubmitAsync" method="post">
+    <button type="submit" class="w-full px-4 py-2 text-left hover:bg-slate-800">Sign out</button>
+</EditForm>
+
+@code {
+    private readonly object _model = new();
+
+    private async Task SubmitAsync()
+    {
+        await SignInManager.SignOutAsync();
+        Navigation.NavigateTo("/account/login", forceLoad: true);
+    }
+}

@@ -1,0 +1,109 @@
+@page "/clients/{Id:guid}"
+@using Dibal.Infrastructure.Identity
+@using Dibal.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@attribute [Authorize]
+@inject DibalDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>@(_client?.BusinessName ?? "Client")</PageTitle>
+
+@if (_client is null)
+{
+    <p class="text-slate-500">Client not found.</p>
+}
+else
+{
+    <div class="flex items-start justify-between">
+        <h1 class="text-xl font-semibold">@_client.BusinessName</h1>
+
+        <AuthorizeView Roles="@Roles.ManagerAndAbove" Context="managerContext">
+            <div class="flex gap-2">
+                <a href="/clients/@_client.Id/edit" class="rounded border px-3 py-1.5 text-sm hover:bg-slate-50">
+                    Edit
+                </a>
+                <EditForm Model="_deleteModel" FormName="soft-delete" OnValidSubmit="SoftDeleteAsync" method="post">
+                    <button type="submit" class="rounded border border-red-300 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50">
+                        Delete
+                    </button>
+                </EditForm>
+            </div>
+        </AuthorizeView>
+    </div>
+
+    <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+        <div><dt class="text-sm text-slate-500">Client name</dt><dd>@(_client.ClientName ?? "—")</dd></div>
+        <div><dt class="text-sm text-slate-500">Customer type</dt><dd>@_client.CustomerType</dd></div>
+        <div><dt class="text-sm text-slate-500">Address</dt><dd>@FormatAddress(_client)</dd></div>
+        <div><dt class="text-sm text-slate-500">Postcode</dt><dd>@(_client.Postcode ?? "—")</dd></div>
+        <div><dt class="text-sm text-slate-500">Email</dt><dd>@(_client.Email ?? "—")</dd></div>
+        <div><dt class="text-sm text-slate-500">Phone</dt><dd>@(_client.Phone ?? "—")</dd></div>
+    </dl>
+
+    @if (!string.IsNullOrWhiteSpace(_client.Notes))
+    {
+        <p class="mt-4 text-sm text-slate-700">@_client.Notes</p>
+    }
+
+    <h2 class="mt-8 text-lg font-semibold">Audit trail</h2>
+    @if (_auditEntries.Count == 0)
+    {
+        <p class="mt-2 text-sm text-slate-500">No history recorded.</p>
+    }
+    else
+    {
+        <ul class="mt-2 space-y-1 text-sm">
+            @foreach (var entry in _auditEntries)
+            {
+                <li>@entry.ChangedAt.ToString("u") — @entry.Action</li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    // No [SupplyParameterFromForm]: this form posts no fields, so there is
+    // nothing to bind. Attempting to bind an empty object sets it to null on
+    // every POST (same failure mode as the earlier Model-binding bug) — the
+    // plain initializer is all EditForm needs here.
+    private readonly object _deleteModel = new();
+
+    private Domain.Entities.Client? _client;
+    private List<Infrastructure.Auditing.AuditLogEntry> _auditEntries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        _client = await Db.Clients.FirstOrDefaultAsync(c => c.Id == Id);
+
+        if (_client is not null)
+        {
+            _auditEntries = await Db.AuditLog
+                .Where(a => a.EntityName == nameof(Domain.Entities.Client) && a.EntityId == Id.ToString())
+                .OrderByDescending(a => a.ChangedAt)
+                .Take(50)
+                .ToListAsync();
+        }
+    }
+
+    private async Task SoftDeleteAsync()
+    {
+        if (_client is null)
+        {
+            return;
+        }
+
+        _client.IsDeleted = true;
+        await Db.SaveChangesAsync();
+        Navigation.NavigateTo("/clients", forceLoad: true);
+    }
+
+    private static string FormatAddress(Domain.Entities.Client client)
+    {
+        var parts = new[] { client.AddressLine1, client.AddressLine2, client.City, client.County }
+            .Where(p => !string.IsNullOrWhiteSpace(p));
+        var joined = string.Join(", ", parts);
+        return string.IsNullOrEmpty(joined) ? "—" : joined;
+    }
+}

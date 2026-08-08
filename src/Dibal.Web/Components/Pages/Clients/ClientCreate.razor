@@ -1,0 +1,44 @@
+@page "/clients/new"
+@using Dibal.Infrastructure.Identity
+@using Dibal.Infrastructure.Persistence
+@attribute [Authorize(Roles = Roles.ManagerAndAbove)]
+@inject DibalDbContext Db
+@inject NavigationManager Navigation
+
+<PageTitle>New client</PageTitle>
+
+<h1 class="text-xl font-semibold">New client</h1>
+
+<EditForm Model="Model" FormName="client-create" OnValidSubmit="SubmitAsync" method="post" class="mt-4 max-w-2xl">
+    <DataAnnotationsValidator />
+    <ClientFormFields Model="Model" />
+
+    <div class="mt-6 flex gap-2">
+        <button type="submit" class="rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
+            Create
+        </button>
+        <a href="/clients" class="rounded border px-4 py-2 hover:bg-slate-50">Cancel</a>
+    </div>
+</EditForm>
+
+@code {
+    [SupplyParameterFromForm]
+    public ClientFormModel Model { get; set; } = new();
+
+    private async Task SubmitAsync()
+    {
+        // CreatedAt/CreatedBy/ModifiedAt/ModifiedBy are stamped by
+        // AuditSaveChangesInterceptor, not set here.
+        var client = new Domain.Entities.Client
+        {
+            BusinessName = Model.BusinessName,
+            CustomerType = Model.CustomerType,
+        };
+        Model.ApplyTo(client);
+
+        Db.Clients.Add(client);
+        await Db.SaveChangesAsync();
+
+        Navigation.NavigateTo($"/clients/{client.Id}", forceLoad: true);
+    }
+}
