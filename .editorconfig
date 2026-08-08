@@ -35,3 +35,12 @@ dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.underscore_camel.required_prefix = _
 dotnet_naming_style.underscore_camel.capitalization = camel_case
+
+# EF Core's migration generator always emits UTF-8 BOM and block-scoped
+# namespaces and cannot be configured otherwise. Without this override,
+# `dotnet ef migrations add` produces a file `dotnet format --verify-no-changes`
+# then fails on in CI — not a real style violation, just a generator mismatch.
+[**/Migrations/*.cs]
+charset = utf-8-bom
+csharp_style_namespace_declarations = block_scoped:silent
+dotnet_style_require_accessibility_modifiers = never:silent

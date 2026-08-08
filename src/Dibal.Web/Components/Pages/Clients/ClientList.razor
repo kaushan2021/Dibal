@@ -1,0 +1,150 @@
+@page "/clients"
+@using Dibal.Domain.Enums
+@using Dibal.Infrastructure.Identity
+@using Dibal.Infrastructure.Persistence
+@using Dibal.Infrastructure.Persistence.Queries
+@attribute [Authorize]
+@inject DibalDbContext Db
+
+<PageTitle>Clients</PageTitle>
+
+<h1 class="text-xl font-semibold">Clients</h1>
+
+<form method="get" class="mt-4 flex flex-wrap items-end gap-3">
+    <div>
+        <label class="block text-sm font-medium" for="search">Search</label>
+        <input id="search" name="search" value="@Search" placeholder="Business, client name, or postcode"
+               class="mt-1 w-64 rounded border px-3 py-2" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium" for="type">Customer type</label>
+        <select id="type" name="type" class="mt-1 rounded border px-3 py-2">
+            <option value="" selected="@(Type is null)">All</option>
+            @foreach (var t in Enum.GetValues<CustomerType>())
+            {
+                <option value="@t" selected="@(Type == t)">@t</option>
+            }
+        </select>
+    </div>
+
+    <button type="submit" class="rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
+        Filter
+    </button>
+
+    <AuthorizeView Roles="@Roles.ManagerAndAbove" Context="managerContext">
+        <a href="/clients/new" class="ml-auto rounded bg-emerald-700 px-4 py-2 text-white hover:bg-emerald-800">
+            New client
+        </a>
+    </AuthorizeView>
+</form>
+
+@if (_result is null)
+{
+    <p class="mt-6 text-slate-500">Loading…</p>
+}
+else if (_result.Items.Count == 0)
+{
+    <p class="mt-6 text-slate-500">No clients match this search.</p>
+}
+else
+{
+    <div class="mt-6 overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+            <thead>
+                <tr class="text-left">
+                    <th class="py-2 pr-4"><a href="?@SortHref(ClientSortBy.BusinessName)" class="hover:underline">Business name@SortMarker(ClientSortBy.BusinessName)</a></th>
+                    <th class="py-2 pr-4"><a href="?@SortHref(ClientSortBy.ClientName)" class="hover:underline">Client name@SortMarker(ClientSortBy.ClientName)</a></th>
+                    <th class="py-2 pr-4"><a href="?@SortHref(ClientSortBy.Postcode)" class="hover:underline">Postcode@SortMarker(ClientSortBy.Postcode)</a></th>
+                    <th class="py-2 pr-4"><a href="?@SortHref(ClientSortBy.CustomerType)" class="hover:underline">Type@SortMarker(ClientSortBy.CustomerType)</a></th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                @foreach (var client in _result.Items)
+                {
+                    <tr>
+                        <td class="py-2 pr-4">
+                            <a class="text-slate-900 underline hover:no-underline" href="/clients/@client.Id">
+                                @client.BusinessName
+                            </a>
+                        </td>
+                        <td class="py-2 pr-4">@client.ClientName</td>
+                        <td class="py-2 pr-4">@client.Postcode</td>
+                        <td class="py-2 pr-4">@client.CustomerType</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4 flex items-center justify-between text-sm">
+        <span>@_result.TotalCount client(s) — page @_result.Page of @Math.Max(1, _result.TotalPages)</span>
+        <div class="flex gap-2">
+            @if (_result.Page > 1)
+            {
+                <a class="rounded border px-3 py-1" href="?@BuildQuery(page: _result.Page - 1)">Previous</a>
+            }
+            @if (_result.Page < _result.TotalPages)
+            {
+                <a class="rounded border px-3 py-1" href="?@BuildQuery(page: _result.Page + 1)">Next</a>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
+    // Blazor's [SupplyParameterFromQuery] only supports a fixed set of
+    // primitive types — enums (including nullable enums) aren't among them
+    // and throw at render time. Bind as string and parse by hand instead.
+    [SupplyParameterFromQuery(Name = "type")]
+    public string? TypeRaw { get; set; }
+
+    [SupplyParameterFromQuery(Name = "sort")]
+    public string? SortRaw { get; set; }
+
+    [SupplyParameterFromQuery(Name = "dir")]
+    public string? Dir { get; set; }
+
+    [SupplyParameterFromQuery(Name = "page")]
+    public int Page { get; set; } = 1;
+
+    private CustomerType? Type => Enum.TryParse<CustomerType>(TypeRaw, out var t) ? t : null;
+    private ClientSortBy Sort => Enum.TryParse<ClientSortBy>(SortRaw, out var s) ? s : ClientSortBy.BusinessName;
+    private bool Descending => Dir == "desc";
+
+    private ClientListResult? _result;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _result = await ClientQueries.GetPagedAsync(Db, new ClientListQuery(
+            Search: Search,
+            CustomerType: Type,
+            SortBy: Sort,
+            Descending: Descending,
+            Page: Page));
+    }
+
+    private string BuildQuery(ClientSortBy? sort = null, bool? descending = null, int? page = null)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(Search)) parts.Add($"search={Uri.EscapeDataString(Search)}");
+        if (Type is not null) parts.Add($"type={Type}");
+        parts.Add($"sort={sort ?? Sort}");
+        parts.Add($"dir={((descending ?? Descending) ? "desc" : "asc")}");
+        parts.Add($"page={page ?? Page}");
+        return string.Join("&", parts);
+    }
+
+    private string SortHref(ClientSortBy field)
+    {
+        // Clicking the already-sorted column flips direction; a different
+        // column starts ascending.
+        var nextDescending = field == Sort && !Descending;
+        return BuildQuery(sort: field, descending: nextDescending, page: 1);
+    }
+
+    private string SortMarker(ClientSortBy field) => field == Sort ? (Descending ? " ▼" : " ▲") : "";
+}

@@ -1,0 +1,68 @@
+@page "/account/login"
+@using Dibal.Infrastructure.Identity
+@using Microsoft.AspNetCore.Identity
+@inject SignInManager<AppUser> SignInManager
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in</PageTitle>
+
+<div class="mx-auto mt-16 max-w-sm">
+    <h1 class="text-xl font-semibold">Sign in</h1>
+
+    @if (_error is not null)
+    {
+        <p class="mt-4 rounded bg-red-50 p-2 text-sm text-red-700">@_error</p>
+    }
+
+    <EditForm Model="_input" FormName="login" OnValidSubmit="SubmitAsync" method="post" class="mt-4 space-y-3">
+        <DataAnnotationsValidator />
+
+        <div>
+            <label class="block text-sm font-medium" for="email">Email</label>
+            <InputText id="email" class="mt-1 w-full rounded border px-3 py-2" @bind-Value="_input.Email" />
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium" for="password">Password</label>
+            <InputText id="password" type="password" class="mt-1 w-full rounded border px-3 py-2" @bind-Value="_input.Password" />
+        </div>
+
+        <button type="submit" class="w-full rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800">
+            Sign in
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    [SupplyParameterFromForm]
+    private LoginInput _input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? _error;
+
+    private async Task SubmitAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(
+            _input.Email, _input.Password, isPersistent: true, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+            return;
+        }
+
+        _error = "Incorrect email or password.";
+    }
+
+    private class LoginInput
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string Email { get; set; } = "";
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Password { get; set; } = "";
+    }
+}

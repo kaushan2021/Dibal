@@ -1,0 +1,35 @@
+@using Dibal.Web.Components.Account
+
+<div class="flex items-center justify-between bg-slate-900 px-4 py-3 text-white md:hidden">
+    <a class="text-lg font-semibold" href="">Dibal</a>
+    <label class="cursor-pointer" for="nav-toggle">Menu</label>
+</div>
+
+<input type="checkbox" id="nav-toggle" class="peer hidden" />
+
+<nav class="hidden flex-col bg-slate-900 text-white peer-checked:flex md:flex md:w-56 md:shrink-0">
+    <a class="hidden px-4 py-4 text-lg font-semibold md:block" href="">Dibal</a>
+
+    <NavLink class="px-4 py-2 hover:bg-slate-800" href="" Match="NavLinkMatch.All">
+        Home
+    </NavLink>
+    <NavLink class="px-4 py-2 hover:bg-slate-800" href="clients">
+        Clients
+    </NavLink>
+    <NavLink class="px-4 py-2 hover:bg-slate-800" href="counter">
+        Render-mode check
+    </NavLink>
+
+    <div class="mt-auto border-t border-slate-700">
+        <AuthorizeView>
+            <Authorized>
+                <LogoutForm />
+            </Authorized>
+            <NotAuthorized>
+                <NavLink class="block px-4 py-2 hover:bg-slate-800" href="account/login">
+                    Sign in
+                </NavLink>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</nav>

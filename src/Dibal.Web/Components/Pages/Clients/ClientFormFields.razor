@@ -1,0 +1,72 @@
+@using Dibal.Domain.Enums
+
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="sm:col-span-2">
+        <label class="block text-sm font-medium">Business name</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.BusinessName" />
+        <ValidationMessage For="() => Model.BusinessName" class="text-sm text-red-600" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">Client name</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.ClientName" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">Customer type</label>
+        <InputSelect class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.CustomerType">
+            @foreach (var t in Enum.GetValues<CustomerType>())
+            {
+                <option value="@t">@t</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="sm:col-span-2">
+        <label class="block text-sm font-medium">Address line 1</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.AddressLine1" />
+    </div>
+
+    <div class="sm:col-span-2">
+        <label class="block text-sm font-medium">Address line 2</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.AddressLine2" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">City</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.City" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">County</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.County" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">Postcode</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.Postcode" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">Email</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.Email" />
+        <ValidationMessage For="() => Model.Email" class="text-sm text-red-600" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium">Phone</label>
+        <InputText class="mt-1 w-full rounded border px-3 py-2" @bind-Value="Model.Phone" />
+    </div>
+
+    <div class="sm:col-span-2">
+        <label class="block text-sm font-medium">Notes</label>
+        <InputTextArea class="mt-1 w-full rounded border px-3 py-2" rows="3" @bind-Value="Model.Notes" />
+    </div>
+</div>
+
+@code {
+    // null! is safe here: EditorRequired makes the compiler/analyzer enforce
+    // that every caller supplies Model before this component renders.
+    [Parameter, EditorRequired]
+    public ClientFormModel Model { get; set; } = null!;
+}

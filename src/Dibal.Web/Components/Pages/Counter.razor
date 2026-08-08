@@ -1,0 +1,27 @@
+@page "/counter"
+@rendermode InteractiveServer
+
+<PageTitle>Render-mode check</PageTitle>
+
+<h1 class="text-xl font-semibold">Render-mode check</h1>
+
+<p class="mt-2 text-sm text-slate-600">
+    This page exists to prove the InteractiveServer / static-SSR split works end to
+    end (Phase 0 exit criterion, docs/03-phases.md). It is not a feature — every
+    other Phase 1 page is static SSR per CLAUDE.md invariant 3.
+</p>
+
+<p role="status" class="mt-4">Current count: @currentCount</p>
+
+<button class="mt-2 rounded bg-slate-900 px-4 py-2 text-white hover:bg-slate-800" @onclick="IncrementCount">
+    Click me
+</button>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+}
